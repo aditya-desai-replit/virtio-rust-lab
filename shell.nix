@@ -1,4 +1,10 @@
-{ pkgs ? import <nixpkgs> {} }:
+{ pkgs ? import (builtins.fetchTarball {
+    url = "https://github.com/NixOS/nixpkgs/archive/714a5f8c4ead6b31148d829288440ed033ccc041.tar.gz";
+    sha256 = "0v06aa1pwq9l69531mv8ll2zp2kg22ayai93vmfwism7ijxp3r35";
+  }) {} }:
 pkgs.mkShell {
-  packages = [ pkgs.cargo pkgs.rustc pkgs.rustfmt pkgs.clippy ];
+  packages = with pkgs; [
+    cargo rustc rustfmt clippy
+    bashInteractive gcc git curl cacert coreutils python3
+  ];
 }

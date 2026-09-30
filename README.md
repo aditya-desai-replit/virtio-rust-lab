@@ -16,7 +16,7 @@ cargo test
 In the Nix sandbox:
 
 ```sh
-nix-shell -I nixpkgs=flake:nixpkgs
+nix-shell
 cargo run
 cargo test
 ```
@@ -26,13 +26,26 @@ The initial standalone virtqueue exercises do not require KVM.
 
 ## Boot Linux
 
-On x86-64 Linux with `/dev/kvm` access, Git, curl, a Rust toolchain, a C linker,
-and Python 3:
+Fresh-workspace prerequisites: **x86-64 Linux, Nix, internet access, and working
+read/write access to `/dev/kvm`**. On Replit, use the Full Stack development
+environment with KVM exposed, not an arbitrary workspace. A setup script cannot
+enable hardware virtualization that the workspace does not provide.
+
+From a fresh clone:
 
 ```sh
+git clone https://github.com/aditya-desai-replit/virtio-rust-lab.git
+cd virtio-rust-lab
+nix-shell
 bash boot/setup.sh
 bash boot/run.sh
 ```
+
+Until this PR is merged, check out `add-linux-boot-lab` after cloning.
+The pinned `shell.nix` supplies Rust, the C linker, Git, curl, Python, and other
+tools without global package installation or a configured Nixpkgs channel.
+Setup tests the KVM API and VM creation before downloading or compiling.
+It verifies the kernel checksum on every run and reuses valid cached artifacts.
 
 At the guest's `/ #` prompt, try `uname -r` or `cat /proc/cmdline`.
 Type `reboot -f` to exit back to the host terminal.
@@ -59,6 +72,12 @@ VMM source: <https://github.com/rust-vmm/vmm-reference>
 The commit and kernel URL/checksum are pinned in `boot/setup.sh`. The kernel
 checksum was recorded from the initial download; it detects subsequent changes
 but is not an independently authenticated signature.
+
+For a noninteractive setup and verification from the repository root:
+
+```sh
+nix-shell --run 'bash boot/setup.sh && cargo test && python3 boot/smoke_test.py'
+```
 
 ## Learning milestones
 

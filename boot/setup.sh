@@ -8,10 +8,29 @@ kernel="$cache/vmlinux-hello-busybox"
 kernel_url=https://vmm-reference-test-resources.s3.amazonaws.com/v5/kernel/vmlinux-hello-busybox
 kernel_sha=603efe3e8fabe5a9084be65f20c6398eb31ddb5a1f2dffd193d4ee3e0590d89c
 
-[[ "$(uname -m)" == x86_64 ]] || { echo "This boot harness requires x86-64." >&2; exit 1; }
-for tool in git curl cargo rustc cc sha256sum; do
-    command -v "$tool" >/dev/null || { echo "Missing tool: $tool" >&2; exit 1; }
+[[ "$(uname -s)" == Linux && "$(uname -m)" == x86_64 ]] ||
+    { echo "This boot harness requires x86-64 Linux." >&2; exit 1; }
+for tool in git curl cargo rustc cc sha256sum python3; do
+    command -v "$tool" >/dev/null ||
+        { echo "Missing tool: $tool. Enter nix-shell first." >&2; exit 1; }
 done
+python3 - <<'PY'
+import fcntl
+import os
+import sys
+try:
+    kvm = os.open("/dev/kvm", os.O_RDWR | os.O_CLOEXEC)
+    try:
+        if fcntl.ioctl(kvm, 0xAE00, 0) != 12:
+            raise RuntimeError("Unsupported KVM API version")
+        vm = fcntl.ioctl(kvm, 0xAE01, 0)
+        os.close(vm)
+    finally:
+        os.close(kvm)
+except (OSError, RuntimeError) as error:
+    sys.exit(f"KVM preflight failed: {error}. Use a workspace with working /dev/kvm access.")
+print("KVM preflight passed.")
+PY
 mkdir -p "$cache"
 if [[ ! -d "$vmm" ]]; then
     git init "$vmm"
