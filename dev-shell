@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+set -euo pipefail
+root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+command -v nix-shell >/dev/null || { echo "Install Nix first." >&2; exit 1; }
+# Avoid nix-shell's implicit <nixpkgs> lookup for its bootstrap Bash.
+export NIX_BUILD_SHELL="$(command -v bash)"
+cd "$root"
+exec nix-shell "$root/shell.nix" "$@"

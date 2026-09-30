@@ -12,7 +12,7 @@ kernel_sha=603efe3e8fabe5a9084be65f20c6398eb31ddb5a1f2dffd193d4ee3e0590d89c
     { echo "This boot harness requires x86-64 Linux." >&2; exit 1; }
 for tool in git curl cargo rustc cc sha256sum python3; do
     command -v "$tool" >/dev/null ||
-        { echo "Missing tool: $tool. Enter nix-shell first." >&2; exit 1; }
+        { echo "Missing tool: $tool. Run bash dev-shell first." >&2; exit 1; }
 done
 python3 - <<'PY'
 import fcntl

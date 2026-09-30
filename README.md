@@ -16,7 +16,7 @@ cargo test
 In the Nix sandbox:
 
 ```sh
-nix-shell
+bash dev-shell
 cargo run
 cargo test
 ```
@@ -36,7 +36,7 @@ From a fresh clone:
 ```sh
 git clone https://github.com/aditya-desai-replit/virtio-rust-lab.git
 cd virtio-rust-lab
-nix-shell
+bash dev-shell
 bash boot/setup.sh
 bash boot/run.sh
 ```
@@ -44,6 +44,7 @@ bash boot/run.sh
 Until this PR is merged, check out `add-linux-boot-lab` after cloning.
 The pinned `shell.nix` supplies Rust, the C linker, Git, curl, Python, and other
 tools without global package installation or a configured Nixpkgs channel.
+The `dev-shell` wrapper also avoids Nix's channel lookup for its bootstrap Bash.
 Setup tests the KVM API and VM creation before downloading or compiling.
 It verifies the kernel checksum on every run and reuses valid cached artifacts.
 
@@ -76,7 +77,7 @@ but is not an independently authenticated signature.
 For a noninteractive setup and verification from the repository root:
 
 ```sh
-nix-shell --run 'bash boot/setup.sh && cargo test && python3 boot/smoke_test.py'
+bash dev-shell --run 'bash boot/setup.sh && cargo test && python3 boot/smoke_test.py'
 ```
 
 ## Learning milestones
