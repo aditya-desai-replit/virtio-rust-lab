@@ -160,6 +160,37 @@ fn fill_chain(memory: &mut [u8], chain: &[Descriptor], value: u8) -> Result<usiz
     Ok(filled)
 }
 
+fn push_used(
+    memory: &mut [u8],
+    used_addr: u64,
+    queue_size: u16,
+    next_used: &mut u16,
+    head: u16,
+    written: u32,
+) -> Result<(), QueueError> {
+    if queue_size == 0 {
+        return Err(QueueError);
+    }
+    if head >= queue_size {
+        return Err(QueueError);
+    }
+    let start = usize::try_from(used_addr).map_err(|_| QueueError)?;
+    let end = start
+        .checked_add(
+            4usize
+                .checked_add(8usize.checked_mul(queue_size as usize).ok_or(QueueError)?)
+                .ok_or(QueueError)?,
+        )
+        .ok_or(QueueError)?;
+    let bytes: &mut [u8] = memory.get_mut(start..end).ok_or(QueueError)?;
+    let slot = usize::try_from(*next_used % queue_size).map_err(|_|QueueError)?;
+    bytes[4+slot*8..4+slot*8+4].copy_from_slice(&(head as u32).to_le_bytes());
+    bytes[4+slot*8+4..4+slot*8+8].copy_from_slice(&(written).to_le_bytes());
+    *next_used = (*next_used).wrapping_add(1);
+    bytes[2..4].copy_from_slice(&(*next_used).to_le_bytes());
+    Ok(())
+}
+
 #[cfg(test)]
 mod descriptor_tests;
 
@@ -174,3 +205,6 @@ mod available_tests;
 
 #[cfg(test)]
 mod fill_tests;
+
+#[cfg(test)]
+mod used_tests;
