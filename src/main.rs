@@ -69,7 +69,7 @@ fn read_chain(
         descriptors.push(d.clone());
         num_seen += 1;
     }
-    
+
     if num_seen == queue_size && has_next(d.clone()) {
         return Err(QueueError);
     }
@@ -77,8 +77,30 @@ fn read_chain(
     Ok(descriptors)
 }
 
+fn can_write(d: &Descriptor) -> bool {
+    d.flags & 2 == 2
+}
+
+fn rng_buffer_range(
+    memory_len: usize,
+    descriptor: &Descriptor,
+) -> Result<std::ops::Range<usize>, QueueError> {
+    if !can_write(descriptor) {
+        return Err(QueueError);
+    }
+    let start = usize::try_from(descriptor.addr).map_err(|_| QueueError)?;
+    let end = start.checked_add(descriptor.len as usize).ok_or(QueueError)?;
+    if end > memory_len {
+        return Err(QueueError);
+    }
+    return Ok(start..end);
+}
+
 #[cfg(test)]
 mod descriptor_tests;
 
 #[cfg(test)]
 mod chain_tests;
+
+#[cfg(test)]
+mod buffer_tests;
