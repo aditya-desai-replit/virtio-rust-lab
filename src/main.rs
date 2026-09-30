@@ -36,7 +36,6 @@ fn read_descriptor(
     let desc_addr = table_addr
         .checked_add((index as u64).checked_mul(16).ok_or(QueueError)?)
         .ok_or(QueueError)?;
-    let desc_addr = desc_addr as usize;
     let start = usize::try_from(desc_addr).map_err(|_| QueueError)?;
     let end = start.checked_add(16).ok_or(QueueError)?;
     let bytes = memory.get(start..end).ok_or(QueueError)?;
@@ -89,11 +88,62 @@ fn rng_buffer_range(
         return Err(QueueError);
     }
     let start = usize::try_from(descriptor.addr).map_err(|_| QueueError)?;
-    let end = start.checked_add(descriptor.len as usize).ok_or(QueueError)?;
+    let end = start
+        .checked_add(descriptor.len as usize)
+        .ok_or(QueueError)?;
     if end > memory_len {
         return Err(QueueError);
     }
     return Ok(start..end);
+}
+
+fn pop_available(
+    memory: &[u8],
+    avail_addr: u64,
+    queue_size: u16,
+    next_avail: &mut u16,
+) -> Result<Option<u16>, QueueError> {
+    if 0 == queue_size {
+        return Err(QueueError);
+    }
+
+    let avail_addr = usize::try_from(avail_addr).map_err(|_| QueueError)?;
+    let avail_start = avail_addr.checked_add(4).ok_or(QueueError)?;
+    let avail_end = avail_start
+        .checked_add((queue_size as usize) * 2)
+        .ok_or(QueueError)?;
+    let bytes = memory.get(avail_start..avail_end).ok_or(QueueError)?;
+    let slot = *next_avail % queue_size;
+    let idx = usize::from(slot) * 2;
+
+    let guest_idx = u16::from_le_bytes(
+        memory
+            .get(avail_addr + 2..avail_addr + 4)
+            .ok_or(QueueError)?
+            .try_into()
+            .map_err(|_| QueueError)?,
+    );
+
+    let pending = guest_idx.wrapping_sub(*next_avail);
+    if pending == 0 {
+        return Ok(None);
+    }
+    if pending > queue_size {
+        return Err(QueueError);
+    }
+
+    let fd = u16::from_le_bytes(
+        bytes
+            .get(idx..idx + 2)
+            .ok_or(QueueError)?
+            .try_into()
+            .map_err(|_| QueueError)?,
+    );
+    if fd >= queue_size {
+        return Err(QueueError);
+    }
+    *next_avail = next_avail.wrapping_add(1);
+    Ok(Some(fd))
 }
 
 #[cfg(test)]
@@ -104,3 +154,6 @@ mod chain_tests;
 
 #[cfg(test)]
 mod buffer_tests;
+
+#[cfg(test)]
+mod available_tests;
