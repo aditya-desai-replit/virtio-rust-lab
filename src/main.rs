@@ -146,6 +146,20 @@ fn pop_available(
     Ok(Some(fd))
 }
 
+fn fill_chain(memory: &mut [u8], chain: &[Descriptor], value: u8) -> Result<usize, QueueError> {
+    let ranges: Vec<_> = chain
+        .iter()
+        .map(|d| rng_buffer_range(memory.len(), d))
+        .collect::<Result<Vec<_>, QueueError>>()?;
+    let filled = ranges.iter().try_fold(0usize, |filled, range| {
+        filled.checked_add(range.len()).ok_or(QueueError)
+    })?;
+    for range in ranges {
+        memory[range.clone()].fill(value);
+    }
+    Ok(filled)
+}
+
 #[cfg(test)]
 mod descriptor_tests;
 
@@ -157,3 +171,6 @@ mod buffer_tests;
 
 #[cfg(test)]
 mod available_tests;
+
+#[cfg(test)]
+mod fill_tests;
