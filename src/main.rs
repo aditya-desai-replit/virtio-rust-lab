@@ -24,6 +24,9 @@ impl Descriptor {
 #[derive(Debug)]
 struct QueueError;
 
+#[derive(Debug)]
+struct RecoverableError;
+
 fn read_descriptor(
     memory: &[u8],
     table_addr: u64,
@@ -183,12 +186,59 @@ fn push_used(
         )
         .ok_or(QueueError)?;
     let bytes: &mut [u8] = memory.get_mut(start..end).ok_or(QueueError)?;
-    let slot = usize::try_from(*next_used % queue_size).map_err(|_|QueueError)?;
-    bytes[4+slot*8..4+slot*8+4].copy_from_slice(&(head as u32).to_le_bytes());
-    bytes[4+slot*8+4..4+slot*8+8].copy_from_slice(&(written).to_le_bytes());
+    let slot = usize::try_from(*next_used % queue_size).map_err(|_| QueueError)?;
+    bytes[4 + slot * 8..4 + slot * 8 + 4].copy_from_slice(&(head as u32).to_le_bytes());
+    bytes[4 + slot * 8 + 4..4 + slot * 8 + 8].copy_from_slice(&(written).to_le_bytes());
     *next_used = (*next_used).wrapping_add(1);
     bytes[2..4].copy_from_slice(&(*next_used).to_le_bytes());
     Ok(())
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct Queue {
+    table_addr: u64,
+    avail_addr: u64,
+    used_addr: u64,
+    size: u16,
+    next_avail: u16,
+    next_used: u16,
+}
+
+fn read_and_write_chain(
+    memory: &mut [u8],
+    queue: &Queue,
+    value: u8,
+    avail_desc: u16,
+) -> Result<u32, RecoverableError> {
+    let descs = read_chain(memory, queue.table_addr, queue.size, avail_desc)
+        .map_err(|_| RecoverableError)?;
+    let written = fill_chain(memory, &descs, value).map_err(|_| RecoverableError)?;
+    let written = u32::try_from(written).map_err(|_| RecoverableError)?;
+    Ok(written)
+}
+
+fn process_one(memory: &mut [u8], queue: &mut Queue, value: u8) -> Result<bool, QueueError> {
+    let Some(avail_desc) =
+        pop_available(memory, queue.avail_addr, queue.size, &mut queue.next_avail)?
+    else {
+        return Ok(false);
+    };
+
+    let written = match read_and_write_chain(memory, queue, value, avail_desc) {
+        Ok(val) => val,
+        Err(RecoverableError) => 0,
+    };
+
+    push_used(
+        memory,
+        queue.used_addr,
+        queue.size,
+        &mut queue.next_used,
+        avail_desc,
+        written,
+    )?;
+
+    Ok(true)
 }
 
 #[cfg(test)]
@@ -208,3 +258,6 @@ mod fill_tests;
 
 #[cfg(test)]
 mod used_tests;
+
+#[cfg(test)]
+mod process_tests;
